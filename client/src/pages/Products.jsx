@@ -1,10 +1,17 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Box, Typography, Button, Alert, Snackbar, TextField, InputAdornment } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import DataTable from '../components/DataTable';
 import FormDialog from '../components/FormDialog';
-import { getProducts, createProduct, updateProduct, deleteProduct, getCategories } from '../services/api';
+import {
+  getProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  getCategories,
+  getUnit,
+} from '../services/api';
 
 const columns = [
   { field: 'product_id', headerName: 'ID', width: 80 },
@@ -23,6 +30,7 @@ const Products = () => {
   const [editItem, setEditItem] = useState(null);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -40,18 +48,29 @@ const Products = () => {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await getCategories();
+      const res = await getCategories({ limit: 1000 });
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
       setCategories(data);
     } catch (err) {
-      console.error('Failed to load categories');
+      showSnackbar('Failed to load categories', 'error');
+    }
+  }, []);
+
+  const fetchUnits = useCallback(async () => {
+    try {
+      const res = await getUnit({ limit: 1000 });
+      const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      setUnits(data);
+    } catch (err) {
+      showSnackbar('Failed to load units', 'error');
     }
   }, []);
 
   useEffect(() => {
     fetchData();
     fetchCategories();
-  }, [fetchData, fetchCategories]);
+    fetchUnits();
+  }, [fetchData, fetchCategories, fetchUnits]);
 
   const handleSearch = (e) => {
     const value = e.target.value;
@@ -108,11 +127,30 @@ const Products = () => {
       name: 'category_id',
       label: 'Category',
       select: true,
-      options: categories.map((c) => ({ value: c.id, label: c.name })),
+      required: false,
+      options: categories.map((c) => ({ value: String(c.id), label: c.name })),
     },
-    { name: 'unit_id', label: 'Unit ID', type: 'number' },
+    {
+      name: 'unit_id',
+      label: 'Unit',
+      select: true,
+      required: false,
+      options: units.map((unit) => ({ value: String(unit.id), label: unit.name })),
+    },
     { name: 'price', label: 'Price', type: 'number' },
   ];
+  const initialValues = useMemo(
+    () => editItem
+      ? {
+          name: editItem.name,
+          barcode: editItem.barcode,
+          category_id: editItem.category_id == null ? '' : String(editItem.category_id),
+          unit_id: editItem.unit_id == null ? '' : String(editItem.unit_id),
+          price: editItem.price,
+        }
+      : null,
+    [editItem]
+  );
 
   return (
     <Box>
@@ -169,7 +207,7 @@ const Products = () => {
         onSubmit={handleSubmit}
         title={editItem ? 'Edit Product' : 'Add Product'}
         fields={fields}
-        initialValues={editItem ? { name: editItem.name, barcode: editItem.barcode, category_id: editItem.category_id, unit_id: editItem.unit_id, price: editItem.price } : null}
+        initialValues={initialValues}
         loading={saving}
       />
 

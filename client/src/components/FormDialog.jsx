@@ -6,6 +6,7 @@ import {
   DialogActions,
   Button,
   TextField,
+  MenuItem,
   Box,
 } from '@mui/material';
 
@@ -50,23 +51,22 @@ const FormDialog = ({ open, onClose, onSubmit, title, fields, initialValues, loa
                 key={field.name}
                 fullWidth
                 label={field.label}
-                type={field.type || 'text'}
-                value={values[field.name] || ''}
+                type={field.select ? undefined : field.type || 'text'}
+                value={values[field.name] ?? ''}
                 onChange={handleChange(field.name)}
                 required={field.required !== false}
                 multiline={field.multiline}
                 rows={field.rows}
-                select={field.select}
-                SelectProps={field.select ? { native: true } : undefined}
-                InputProps={{
-                  sx: { borderRadius: 2 },
+                select={Boolean(field.select)}
+                slotProps={{
+                  input: { sx: { borderRadius: 2 } },
                 }}
               >
                 {field.select &&
                   field.options?.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
+                    <MenuItem key={opt.value} value={opt.value}>
                       {opt.label}
-                    </option>
+                    </MenuItem>
                   ))}
               </TextField>
             ))}

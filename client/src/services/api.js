@@ -71,6 +71,19 @@ export const deleteSupplier = (id) => api.delete(`/suppliers/${id}`);
 // Transactions
 export const getTransactions = (params) => api.get('/transactions', { params });
 export const createTransaction = (data) => api.post('/transactions', data);
+export const getReturnableTransaction = (id) => api.get(`/transactions/${id}/returnable`);
+export const createTransactionReturn = (id, data) => api.post(`/transactions/${id}/returns`, data);
+
+// Cashier shifts
+export const getActiveShift = () => api.get('/shifts/active');
+export const getShiftHistory = () => api.get('/shifts/history');
+export const openShift = (data) => api.post('/shifts/open', data);
+export const getCashMovements = (id) => api.get(`/shifts/${id}/movements`);
+export const addCashMovement = (id, data) => api.post(`/shifts/${id}/movements`, data);
+export const closeShift = (id, data) => api.post(`/shifts/${id}/close`, data);
+
+// Reports
+export const getSalesReport = (params) => api.get('/reports/sales', { params });
 
 // Warehouses
 export const getWarehouses = (params) => api.get('/warehouse', { params });
@@ -83,5 +96,18 @@ export const getStocks = (params) => api.get('/stock', { params });
 export const createStock = (data) => api.post('/stock', data);
 export const updateStock = (id, data) => api.put(`/stock/${id}`, data);
 export const deleteStock = (id) => api.delete(`/stock/${id}`);
+
+export const getUnit = (params) => api.get('/unit', { params });
+export const createUnit = (data) => api.post('/unit', data);
+export const updateUnit = (id, data) => api.put(`/unit/${id}`, data);
+export const deleteUnit = (id) => api.delete(`/unit/${id}`);
+
+
+// Account
+export const getAccount = (params) => api.get('/account', { params });
+export const createAccount = (data) => api.post('/account', data);
+export const updateAccount = (id, data) => api.put(`/account/${id}`, data);
+export const deleteAccount = (id) => api.delete(`/account/${id}`);
+
 
 export default api;

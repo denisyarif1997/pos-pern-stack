@@ -1,313 +1,354 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Box, Typography, Button, Alert, Snackbar, Card, CardContent,
-  TextField, Grid, IconButton, Autocomplete, Dialog, DialogTitle,
-  DialogContent, DialogActions, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, Paper, InputAdornment,
+  Alert,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  InputAdornment,
+  MenuItem,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import SearchIcon from '@mui/icons-material/Search';
+import ReplayIcon from '@mui/icons-material/Replay';
 import DataTable from '../components/DataTable';
-import { getTransactions, createTransaction, getProducts, getCustomers } from '../services/api';
+import { createTransactionReturn, getReturnableTransaction, getTransactions } from '../services/api';
+
+const currency = new Intl.NumberFormat('id-ID', {
+  style: 'currency',
+  currency: 'IDR',
+  maximumFractionDigits: 0,
+});
 
 const columns = [
-  { field: 'id', headerName: 'ID', width: 80 },
-  { field: 'cashier name', headerName: 'Cashier', width: 120 },
-  { field: 'customer name', headerName: 'Customer', width: 150 },
-  { field: 'nama barang', headerName: 'Product', flex: 1 },
-  { field: 'jumlah item', headerName: 'Qty', width: 80 },
-  { field: 'total', headerName: 'Total', width: 130, renderCell: (params) => `Rp ${Number(params.value).toLocaleString()}` },
-  { field: 'pembayaran', headerName: 'Payment', width: 130, renderCell: (params) => `Rp ${Number(params.value).toLocaleString()}` },
-  { field: 'kembalian', headerName: 'Change', width: 130, renderCell: (params) => `Rp ${Number(params.value).toLocaleString()}` },
-  { field: 'tanggal transaksi', headerName: 'Date', width: 180 },
+  { field: 'id', headerName: 'No. transaksi', width: 130 },
+  { field: 'cashier name', headerName: 'Kasir', width: 160 },
+  { field: 'customer name', headerName: 'Pelanggan', width: 180 },
+  { field: 'nama barang', headerName: 'Produk', flex: 1, minWidth: 180 },
+  { field: 'jumlah item', headerName: 'Qty', width: 90 },
+  { field: 'jumlah diretur', headerName: 'Qty retur', width: 100 },
+  { field: 'sisa retur', headerName: 'Sisa retur', width: 100 },
+  { field: 'total', headerName: 'Total', width: 150, renderCell: (params) => currency.format(Number(params.value) || 0) },
+  { field: 'pembayaran', headerName: 'Dibayar', width: 150, renderCell: (params) => currency.format(Number(params.value) || 0) },
+  { field: 'metode pembayaran', headerName: 'Metode', width: 170 },
+  { field: 'kembalian', headerName: 'Kembalian', width: 150, renderCell: (params) => currency.format(Number(params.value) || 0) },
+  { field: 'total refund', headerName: 'Total refund', width: 150, renderCell: (params) => currency.format(Number(params.value) || 0) },
+  { field: 'tanggal transaksi', headerName: 'Tanggal', width: 190 },
 ];
+
+const normalizeTransactions = (rows) => {
+  const grouped = new Map();
+
+  rows.forEach((row) => {
+    const transaction = grouped.get(row.id) || {
+      ...row,
+      products: new Set(),
+      itemCount: 0,
+      returnedQuantity: 0,
+      remainingQuantity: 0,
+    };
+
+    if (row['nama barang']) transaction.products.add(row['nama barang']);
+    transaction.itemCount += Number(row['jumlah item']) || 0;
+    transaction.returnedQuantity += Number(row['jumlah diretur']) || 0;
+    transaction.remainingQuantity += Number(row['sisa retur']) || 0;
+    grouped.set(row.id, transaction);
+  });
+
+  return Array.from(grouped.values(), (transaction) => ({
+    ...transaction,
+    'nama barang': Array.from(transaction.products).join(', '),
+    'jumlah item': transaction.itemCount,
+    'jumlah diretur': transaction.returnedQuantity,
+    'sisa retur': transaction.remainingQuantity,
+  }));
+};
 
 const Transactions = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [cart, setCart] = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [quantity, setQuantity] = useState(1);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [payment, setPayment] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [searchTerm, setSearchTerm] = useState('');
+  const [returningTransaction, setReturningTransaction] = useState(null);
+  const [returnDetails, setReturnDetails] = useState([]);
+  const [returnHistory, setReturnHistory] = useState([]);
+  const [returnQuantities, setReturnQuantities] = useState({});
+  const [refundMethod, setRefundMethod] = useState('cash');
+  const [returnReason, setReturnReason] = useState('');
+  const [returnLoading, setReturnLoading] = useState(false);
+  const [returnSaving, setReturnSaving] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
 
-  const fetchData = useCallback(async (search = '') => {
+  const fetchTransactions = async (isActive = () => true) => {
     try {
-      const res = await getTransactions({ search });
-      const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-      setRows(data);
-    } catch (err) {
-      showSnackbar('Failed to load transactions', 'error');
+      const response = await getTransactions();
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      if (isActive()) setRows(normalizeTransactions(data));
+    } catch {
+      if (isActive()) {
+        setSnackbar({ open: true, message: 'Gagal memuat riwayat transaksi.', severity: 'error' });
+      }
     } finally {
-      setLoading(false);
+      if (isActive()) setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    let active = true;
+    fetchTransactions(() => active);
+    return () => { active = false; };
   }, []);
 
-  const fetchOptions = useCallback(async () => {
+  const openReturnDialog = async (row) => {
+    setReturningTransaction(row);
+    setReturnLoading(true);
+    setReturnDetails([]);
+    setReturnHistory([]);
+    setReturnQuantities({});
+    setRefundMethod('cash');
+    setReturnReason('');
     try {
-      const [pRes, cRes] = await Promise.all([getProducts(), getCustomers()]);
-      const pData = Array.isArray(pRes.data) ? pRes.data : pRes.data?.data || [];
-      const cData = Array.isArray(cRes.data) ? cRes.data : cRes.data?.data || [];
-      setProducts(pData);
-      setCustomers(cData);
-    } catch (err) {
-      console.error('Failed to load options');
-    }
-  }, []);
-
-  useEffect(() => { fetchData(); fetchOptions(); }, [fetchData, fetchOptions]);
-
-  const handleSearch = (e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    fetchData(value);
-  };
-
-  const showSnackbar = (message, severity) => setSnackbar({ open: true, message, severity });
-
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const change = payment - total;
-
-  const addToCart = () => {
-    if (!selectedProduct) return;
-    const existing = cart.find((item) => item.product_id === selectedProduct.product_id);
-    if (existing) {
-      setCart(cart.map((item) =>
-        item.product_id === selectedProduct.product_id
-          ? { ...item, quantity: item.quantity + quantity }
-          : item
-      ));
-    } else {
-      setCart([...cart, {
-        product_id: selectedProduct.product_id,
-        name: selectedProduct.name,
-        price: Number(selectedProduct.price),
-        quantity: quantity,
-      }]);
-    }
-    setSelectedProduct(null);
-    setQuantity(1);
-  };
-
-  const removeFromCart = (productId) => {
-    setCart(cart.filter((item) => item.product_id !== productId));
-  };
-
-  const handleCreateTransaction = async () => {
-    if (cart.length === 0) {
-      showSnackbar('Cart is empty', 'error');
-      return;
-    }
-    if (payment < total) {
-      showSnackbar('Payment is less than total', 'error');
-      return;
-    }
-    setSaving(true);
-    try {
-      const details = cart.map((item) => ({
-        product_id: item.product_id,
-        quantity: item.quantity,
-        price: item.price,
-      }));
-      await createTransaction({
-        user_id: 1,
-        customer_id: selectedCustomer?.id || null,
-        total,
-        payment,
-        change,
-        details,
+      const response = await getReturnableTransaction(row.id);
+      setReturnDetails(response.data.details || []);
+      setReturnHistory(response.data.returns || []);
+    } catch (error) {
+      setReturningTransaction(null);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Gagal memuat detail barang yang dapat diretur.',
+        severity: 'error',
       });
-      showSnackbar('Transaction created successfully', 'success');
-      setCreateOpen(false);
-      setCart([]);
-      setSelectedCustomer(null);
-      setPayment(0);
-      fetchData();
-    } catch (err) {
-      showSnackbar(err.response?.data?.error || 'Failed to create transaction', 'error');
     } finally {
-      setSaving(false);
+      setReturnLoading(false);
     }
   };
+
+  const selectedReturnItems = returnDetails
+    .map((detail) => ({
+      transaction_detail_id: detail.transaction_detail_id,
+      quantity: Number(returnQuantities[detail.transaction_detail_id]) || 0,
+      detail,
+    }))
+    .filter((item) => item.quantity > 0);
+  const refundAmount = selectedReturnItems.reduce(
+    (sum, item) => sum + item.quantity * Number(item.detail.price), 0
+  );
+
+  const submitReturn = async () => {
+    if (!selectedReturnItems.length) {
+      setSnackbar({ open: true, message: 'Masukkan jumlah barang yang akan diretur.', severity: 'error' });
+      return;
+    }
+    if (selectedReturnItems.some((item) => item.quantity > item.detail.returnable_quantity)) {
+      setSnackbar({ open: true, message: 'Jumlah retur melebihi sisa barang yang dapat diretur.', severity: 'error' });
+      return;
+    }
+
+    setReturnSaving(true);
+    try {
+      await createTransactionReturn(returningTransaction.id, {
+        items: selectedReturnItems.map(({ transaction_detail_id, quantity }) => ({
+          transaction_detail_id,
+          quantity,
+        })),
+        refund_method: refundMethod,
+        reason: returnReason,
+      });
+      setReturningTransaction(null);
+      setSnackbar({
+        open: true,
+        message: `Retur berhasil diproses. Refund ${currency.format(refundAmount)}.`,
+        severity: 'success',
+      });
+      await fetchTransactions();
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Gagal memproses retur transaksi.',
+        severity: 'error',
+      });
+    } finally {
+      setReturnSaving(false);
+    }
+  };
+
+  const filteredRows = useMemo(() => {
+    const term = searchTerm.trim().toLocaleLowerCase();
+    if (!term) return rows;
+    return rows.filter((row) => [
+      row.id,
+      row['cashier name'],
+      row['customer name'],
+      row['nama barang'],
+      row['tanggal transaksi'],
+    ].some((value) => String(value || '').toLocaleLowerCase().includes(term)));
+  }, [rows, searchTerm]);
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary' }}>Transactions</Typography>
-        <Button variant="contained" startIcon={<ShoppingCartIcon />} onClick={() => setCreateOpen(true)}
-          sx={{ borderRadius: 3, px: 3 }}>
-          New Transaction
-        </Button>
-      </Box>
-
+    <Box sx={{ maxWidth: 1600, mx: 'auto' }}>
       <Box sx={{ mb: 3 }}>
+        <Typography variant="h4">Riwayat transaksi</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+          Lihat dan cari transaksi penjualan yang sudah diproses.
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          {filteredRows.length} transaksi
+        </Typography>
         <TextField
-          fullWidth
-          placeholder="Search transactions..."
+          size="small"
+          placeholder="Cari transaksi..."
           value={searchTerm}
-          onChange={handleSearch}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              backgroundColor: 'background.paper',
+          onChange={(event) => setSearchTerm(event.target.value)}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              ),
             },
+            htmlInput: { 'aria-label': 'Cari transaksi' },
           }}
+          sx={{ width: { xs: '100%', sm: 340 }, bgcolor: 'background.paper' }}
         />
       </Box>
-      <DataTable rows={rows} columns={columns} loading={loading} getRowId={(row) => row.id} />
-
-      {/* Create Transaction Dialog */}
+      <DataTable
+        rows={filteredRows}
+        columns={columns}
+        loading={loading}
+        getRowId={(row) => row.id}
+        onCustomAction={openReturnDialog}
+        customActionLabel="Retur transaksi"
+        customActionIcon={<ReplayIcon fontSize="small" />}
+        customActionDisabled={(row) => !row['sisa retur']}
+      />
       <Dialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        open={Boolean(returningTransaction)}
+        onClose={() => !returnSaving && setReturningTransaction(null)}
         maxWidth="md"
         fullWidth
-        PaperProps={{
-          sx: {
-            backgroundColor: 'background.paper',
-            border: 'none',
-            borderRadius: 4,
-            boxShadow: '0px 18px 40px rgba(112, 144, 176, 0.12)',
-            minHeight: '60vh',
-          },
-        }}
       >
-        <DialogTitle sx={{ color: 'text.primary', fontWeight: 700 }}>New Transaction</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mb: 3, mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <Autocomplete
-                options={customers}
-                getOptionLabel={(option) => option['Nama Customer'] || option.name || ''}
-                value={selectedCustomer}
-                onChange={(e, val) => setSelectedCustomer(val)}
-                renderInput={(params) => (
-                  <TextField {...params} label="Customer (optional)" size="small"
-                    InputProps={{ ...params.InputProps, sx: { borderRadius: 2 } }}
-                  />
-                )}
-              />
-            </Grid>
-          </Grid>
-
-          {/* Add to cart */}
-          <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center', flexWrap: 'wrap' }}>
-            <Autocomplete
-              options={products}
-              getOptionLabel={(option) => `${option.name} - Rp ${Number(option.price).toLocaleString()}`}
-              value={selectedProduct}
-              onChange={(e, val) => setSelectedProduct(val)}
-              sx={{ flex: 1, minWidth: 250 }}
-              renderInput={(params) => (
-                <TextField {...params} label="Search Product" size="small"
-                  InputProps={{ ...params.InputProps, sx: { borderRadius: 2 } }}
-                />
+        <DialogTitle>Retur transaksi #{returningTransaction?.id}</DialogTitle>
+        <DialogContent dividers>
+          {returnLoading ? (
+            <Typography color="text.secondary">Memuat detail transaksi...</Typography>
+          ) : (
+            <Stack spacing={2}>
+              <Typography variant="body2" color="text.secondary">
+                Isi jumlah barang yang dikembalikan. Refund dihitung dari harga pada transaksi.
+              </Typography>
+              {returnHistory.length > 0 && (
+                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>
+                  <Typography fontWeight={700} sx={{ mb: 0.75 }}>Riwayat retur</Typography>
+                  <Stack spacing={1}>
+                    {returnHistory.map((item) => (
+                      <Box key={item.id}>
+                        <Typography variant="body2">
+                          {new Date(item.created_at).toLocaleString('id-ID')} · {item.refund_method.toUpperCase()}
+                          {' · '}{currency.format(Number(item.refund_amount) || 0)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Diproses oleh {item.processed_by}
+                          {item.reason ? ` · ${item.reason}` : ''}
+                        </Typography>
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          {item.items.map((returnedItem) => `${returnedItem.product_name} × ${returnedItem.quantity}`).join(', ')}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
               )}
-              isOptionEqualToValue={(option, value) => option.product_id === value?.product_id}
-            />
-            <TextField
-              label="Qty"
-              type="number"
-              size="small"
-              value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-              sx={{ width: 100 }}
-              InputProps={{ sx: { borderRadius: 2 } }}
-            />
-            <IconButton onClick={addToCart} color="primary" sx={{ background: 'rgba(144, 202, 249, 0.15)' }}>
-              <AddIcon />
-            </IconButton>
-          </Box>
-
-          {/* Cart Table */}
-          <TableContainer component={Paper} sx={{ mb: 2, borderRadius: 2, border: 'none', boxShadow: '0px 4px 12px rgba(112, 144, 176, 0.08)' }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }}>Product</TableCell>
-                  <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }} align="right">Price</TableCell>
-                  <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }} align="right">Qty</TableCell>
-                  <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }} align="right">Subtotal</TableCell>
-                  <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }} width={50}></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {cart.map((item) => (
-                  <TableRow key={item.product_id}>
-                    <TableCell sx={{ color: 'text.primary' }}>{item.name}</TableCell>
-                    <TableCell sx={{ color: 'text.primary' }} align="right">Rp {item.price.toLocaleString()}</TableCell>
-                    <TableCell sx={{ color: 'text.primary' }} align="right">{item.quantity}</TableCell>
-                    <TableCell sx={{ color: 'text.primary' }} align="right">Rp {(item.price * item.quantity).toLocaleString()}</TableCell>
-                    <TableCell>
-                      <IconButton size="small" onClick={() => removeFromCart(item.product_id)} sx={{ color: '#f48fb1' }}>
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {cart.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ color: 'text.secondary' }}>Cart is empty</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          {/* Payment */}
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={6}>
-              <Typography variant="h6" sx={{ color: 'text.primary', fontWeight: 700 }}>Total: Rp {total.toLocaleString()}</Typography>
-            </Grid>
-            <Grid item xs={6}>
+              {returnDetails.length === 0 && !returnLoading && (
+                <Alert severity="info">Transaksi ini tidak memiliki barang yang dapat diretur.</Alert>
+              )}
+              {returnDetails.map((detail) => (
+                <Box
+                  key={detail.transaction_detail_id}
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 120px' },
+                    alignItems: 'center',
+                    gap: 1.5,
+                    p: 1.5,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                  }}
+                >
+                  <Box>
+                    <Typography fontWeight={700}>{detail.product_name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Terjual {detail.sold_quantity} · sudah diretur {detail.returned_quantity} · sisa {detail.returnable_quantity}
+                      {' · '}{currency.format(Number(detail.price) || 0)} / unit
+                    </Typography>
+                  </Box>
+                  <TextField
+                    label="Qty retur"
+                    type="number"
+                    size="small"
+                    value={returnQuantities[detail.transaction_detail_id] ?? 0}
+                    onChange={(event) => setReturnQuantities((current) => ({
+                      ...current,
+                      [detail.transaction_detail_id]: event.target.value,
+                    }))}
+                    disabled={detail.returnable_quantity === 0}
+                    slotProps={{ htmlInput: { min: 0, max: detail.returnable_quantity, step: 1 } }}
+                  />
+                </Box>
+              ))}
               <TextField
+                select
+                label="Metode refund"
+                value={refundMethod}
+                onChange={(event) => setRefundMethod(event.target.value)}
                 fullWidth
-                label="Payment Amount"
-                type="number"
-                size="small"
-                value={payment}
-                onChange={(e) => setPayment(Number(e.target.value) || 0)}
-                InputProps={{ sx: { borderRadius: 2 } }}
+              >
+                <MenuItem value="cash">Tunai</MenuItem>
+                <MenuItem value="qris">QRIS</MenuItem>
+                <MenuItem value="transfer">Transfer</MenuItem>
+                <MenuItem value="card">Kartu</MenuItem>
+              </TextField>
+              <TextField
+                label="Alasan retur (opsional)"
+                value={returnReason}
+                onChange={(event) => setReturnReason(event.target.value)}
+                inputProps={{ maxLength: 500 }}
+                multiline
+                minRows={2}
+                fullWidth
               />
-            </Grid>
-            {payment > 0 && (
-              <Grid item xs={12}>
-                <Typography variant="body1" sx={{ color: change >= 0 ? 'success.main' : 'error.main', fontWeight: 600 }}>
-                  Change: Rp {change.toLocaleString()}
-                </Typography>
-              </Grid>
-            )}
-          </Grid>
+              <Typography variant="h6">
+                Total refund: {currency.format(refundAmount)}
+              </Typography>
+            </Stack>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setCreateOpen(false)} sx={{ color: 'text.secondary', fontWeight: 600 }}>Cancel</Button>
+          <Button onClick={() => setReturningTransaction(null)} disabled={returnSaving}>Batal</Button>
           <Button
             variant="contained"
-            onClick={handleCreateTransaction}
-            disabled={saving || cart.length === 0}
-            sx={{ borderRadius: 2, px: 3 }}
+            onClick={submitReturn}
+            disabled={returnLoading || returnSaving || !returnDetails.some((detail) => detail.returnable_quantity > 0)}
           >
-            {saving ? 'Processing...' : 'Complete Transaction'}
+            {returnSaving ? 'Memproses...' : 'Proses retur'}
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
-        <Alert severity={snackbar.severity} sx={{ borderRadius: 2 }}>{snackbar.message}</Alert>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3500}
+        onClose={() => setSnackbar((current) => ({ ...current, open: false }))}
+      >
+        <Alert severity={snackbar.severity} variant="filled" sx={{ borderRadius: 2 }}>
+          {snackbar.message}
+        </Alert>
       </Snackbar>
     </Box>
   );

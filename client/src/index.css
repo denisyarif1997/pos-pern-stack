@@ -19,5 +19,40 @@ html {
 html, body, #root {
   height: 100%;
   font-family: 'Inter', sans-serif;
-  background-color: #F4F7FE;
+  background-color: #F5F7FA;
+}
+
+body {
+  min-width: 320px;
+}
+
+button, a, input {
+  font: inherit;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #pos-print-receipt,
+  #pos-print-receipt * {
+    visibility: visible !important;
+  }
+
+  #pos-print-receipt {
+    position: fixed !important;
+    inset: 0 auto auto 0 !important;
+    width: 76mm !important;
+    max-width: 76mm !important;
+    padding: 4mm !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  #pos-print-receipt .MuiTypography-root {
+    color: #000 !important;
+  }
 }

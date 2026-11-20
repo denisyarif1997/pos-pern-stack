@@ -21,29 +21,41 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import CategoryIcon from '@mui/icons-material/Category';
 import PeopleIcon from '@mui/icons-material/People';
 import GroupIcon from '@mui/icons-material/Group';
 import PersonIcon from '@mui/icons-material/Person';
-import ReceiptIcon from '@mui/icons-material/Receipt';
 import WarehouseIcon from '@mui/icons-material/Warehouse';
 import StorageIcon from '@mui/icons-material/Storage';
+import StraightenIcon from '@mui/icons-material/Straighten';
 import LogoutIcon from '@mui/icons-material/Logout';
+import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
 import { useAuth } from '../context/AuthContext';
+import AccountIcon from '@mui/icons-material/AccountBox';
+
 
 const drawerWidth = 260;
 
 const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-  { text: 'Products', icon: <InventoryIcon />, path: '/products' },
-  { text: 'Categories', icon: <CategoryIcon />, path: '/categories' },
-  { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
-  { text: 'Suppliers', icon: <GroupIcon />, path: '/suppliers' },
-  { text: 'Users', icon: <PersonIcon />, path: '/users' },
-  { text: 'Transactions', icon: <ReceiptIcon />, path: '/transactions' },
-  { text: 'Warehouses', icon: <WarehouseIcon />, path: '/warehouses' },
-  { text: 'Stock / Inventory', icon: <StorageIcon />, path: '/stock' },
+  { text: 'Kasir / POS', icon: <PointOfSaleIcon />, path: '/' },
+  { text: 'Shift Kasir', icon: <CurrencyExchangeIcon />, path: '/shifts' },
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+  { text: 'Transaksi', icon: <ReceiptIcon />, path: '/transactions' },
+  { text: 'Laporan Penjualan', icon: <AssessmentIcon />, path: '/reports' },
+  { text: 'Produk', icon: <InventoryIcon />, path: '/products' },
+  { text: 'Kategori', icon: <CategoryIcon />, path: '/categories' },
+  { text: 'Satuan', icon: <StraightenIcon />, path: '/units' },
+  { text: 'Pelanggan', icon: <PeopleIcon />, path: '/customers' },
+  { text: 'Pemasok', icon: <GroupIcon />, path: '/suppliers' },
+  { text: 'Pengguna', icon: <PersonIcon />, path: '/users' },
+  { text: 'Gudang', icon: <WarehouseIcon />, path: '/warehouses' },
+  { text: 'Stok & Persediaan', icon: <StorageIcon />, path: '/stock' },
+  { text: 'Akun', icon: <AccountIcon />, path: '/account' },
+
 ];
 
 const Layout = () => {
@@ -67,15 +79,28 @@ const Layout = () => {
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ p: 2, textAlign: 'center' }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-          Warehouse Manager
-        </Typography>
+      <Box sx={{ px: 2.5, py: 2.25, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ width: 40, height: 40, borderRadius: 2.5, display: 'grid', placeItems: 'center', bgcolor: 'primary.main', color: '#fff' }}>
+          <PointOfSaleIcon />
+        </Box>
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+            Kasir POS
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Sistem kasir &amp; toko
+          </Typography>
+        </Box>
       </Box>
-      <Divider sx={{ borderColor: 'rgba(0,0,0,0.08)' }} />
-      <List sx={{ flex: 1, px: 1 }}>
+      <Divider />
+      <Typography variant="overline" sx={{ px: 2.5, pt: 2.5, pb: 1, color: 'text.secondary', letterSpacing: '0.08em', fontWeight: 700 }}>
+        Menu
+      </Typography>
+      <List sx={{ flex: 1, px: 1.5, pt: 0 }}>
         {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = item.path === '/'
+            ? location.pathname === item.path
+            : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
           return (
             <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
@@ -84,10 +109,11 @@ const Layout = () => {
                   if (isMobile) setMobileOpen(false);
                 }}
                 sx={{
-                  borderRadius: 2,
-                  backgroundColor: isActive ? 'rgba(67, 24, 255, 0.08)' : 'transparent',
+                  borderRadius: 2.5,
+                  minHeight: 44,
+                  backgroundColor: isActive ? 'rgba(15, 118, 110, 0.09)' : 'transparent',
                   '&:hover': {
-                    backgroundColor: 'rgba(67, 24, 255, 0.04)',
+                    backgroundColor: isActive ? 'rgba(15, 118, 110, 0.12)' : 'rgba(23, 43, 77, 0.04)',
                   },
                 }}
               >
@@ -99,8 +125,8 @@ const Layout = () => {
                   sx={{
                     '& .MuiListItemText-primary': {
                       color: isActive ? 'primary.main' : 'text.secondary',
-                      fontWeight: isActive ? 700 : 500,
-                      fontSize: '0.9rem',
+                      fontWeight: isActive ? 700 : 600,
+                      fontSize: '0.875rem',
                     },
                   }}
                 />
@@ -109,10 +135,10 @@ const Layout = () => {
           );
         })}
       </List>
-      <Divider sx={{ borderColor: 'rgba(0,0,0,0.08)' }} />
+      <Divider />
       <Box sx={{ p: 2 }}>
-        <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-          v1.0.0
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', textAlign: 'center' }}>
+          Sistem POS · v1.0.0
         </Typography>
       </Box>
     </Box>
@@ -120,7 +146,6 @@ const Layout = () => {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      {/* App Bar */}
       <AppBar
         position="fixed"
         elevation={0}
@@ -129,10 +154,12 @@ const Layout = () => {
           ml: { md: `${drawerWidth}px` },
           backgroundColor: 'background.paper',
           color: 'text.primary',
-          borderBottom: '1px solid rgba(0,0,0,0.05)',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 'none',
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ minHeight: '72px !important', px: { xs: 2, md: 3 } }}>
           <IconButton
             color="inherit"
             edge="start"
@@ -141,11 +168,16 @@ const Layout = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap sx={{ flexGrow: 1, fontWeight: 700 }}>
-            {menuItems.find((item) => item.path === location.pathname)?.text || 'Warehouse Manager'}
-          </Typography>
-          <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
-            <Avatar sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 700 }}>
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography variant="subtitle1" noWrap sx={{ fontWeight: 700 }}>
+              {menuItems.find((item) => item.path === location.pathname)?.text || 'Kasir POS'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+              Operasional toko
+            </Typography>
+          </Box>
+          <IconButton onClick={handleMenuOpen} aria-label="Open account menu" sx={{ p: 0 }}>
+            <Avatar sx={{ width: 38, height: 38, bgcolor: 'primary.light', color: 'primary.dark', fontWeight: 700 }}>
               {user?.name?.charAt(0)?.toUpperCase() || 'U'}
             </Avatar>
           </IconButton>
@@ -157,7 +189,7 @@ const Layout = () => {
               sx: {
                 backgroundColor: 'background.paper',
                 border: '1px solid rgba(0,0,0,0.05)',
-                boxShadow: '0px 18px 40px rgba(112, 144, 176, 0.12)',
+                boxShadow: '0 12px 32px rgba(23, 43, 77, 0.14)',
                 mt: 1,
                 minWidth: 150,
               },
@@ -179,7 +211,6 @@ const Layout = () => {
         </Toolbar>
       </AppBar>
 
-      {/* Drawer */}
       <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
         {isMobile ? (
           <Drawer
@@ -191,8 +222,8 @@ const Layout = () => {
               '& .MuiDrawer-paper': {
                 width: drawerWidth,
                 backgroundColor: 'background.paper',
-                borderRight: 'none',
-                boxShadow: '14px 0px 40px rgba(112, 144, 176, 0.08)',
+                borderRight: '1px solid #E8EDF3',
+                boxShadow: '0 12px 32px rgba(23, 43, 77, 0.12)',
               },
             }}
           >
@@ -205,8 +236,8 @@ const Layout = () => {
               '& .MuiDrawer-paper': {
                 width: drawerWidth,
                 backgroundColor: 'background.paper',
-                borderRight: 'none',
-                boxShadow: '14px 0px 40px rgba(112, 144, 176, 0.08)',
+                borderRight: '1px solid #E8EDF3',
+                boxShadow: 'none',
               },
             }}
             open
@@ -216,15 +247,14 @@ const Layout = () => {
         )}
       </Box>
 
-      {/* Main Content */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: { xs: 2, sm: 3, lg: 4 },
           width: { md: `calc(100% - ${drawerWidth}px)` },
-          mt: 8,
-          minHeight: 'calc(100vh - 64px)',
+          mt: '72px',
+          minHeight: '100vh',
         }}
       >
         <Outlet />

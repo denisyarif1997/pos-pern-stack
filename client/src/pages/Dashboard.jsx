@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Card, CardContent, Typography, Box, CircularProgress } from '@mui/material';
+import { Card, CardContent, Typography, Box, CircularProgress } from '@mui/material';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import CategoryIcon from '@mui/icons-material/Category';
 import PeopleIcon from '@mui/icons-material/People';
@@ -11,10 +11,9 @@ import { getProducts, getCategories, getCustomers, getTransactions, getWarehouse
 const StatCard = ({ title, value, icon, color }) => (
   <Card
     sx={{
-      backgroundColor: 'background.paper',
       transition: 'transform 0.2s, box-shadow 0.2s',
       '&:hover': {
-        transform: 'translateY(-4px)',
+        transform: 'translateY(-3px)',
         boxShadow: `0 12px 32px ${color}33`,
       },
     }}
@@ -22,14 +21,13 @@ const StatCard = ({ title, value, icon, color }) => (
     <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 3 }}>
       <Box
         sx={{
-          width: 56,
-          height: 56,
-          borderRadius: 3,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: `${color}33`,
-          color: color,
+          width: 52,
+          height: 52,
+          borderRadius: 2.5,
+          display: 'grid',
+          placeItems: 'center',
+          background: `${color}1A`,
+          color,
         }}
       >
         {icon}
@@ -51,6 +49,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+
     const fetchStats = async () => {
       try {
         const [productsRes, categoriesRes, customersRes, transactionsRes, warehousesRes, suppliersRes] = await Promise.all([
@@ -62,29 +62,31 @@ const Dashboard = () => {
           getSuppliers(),
         ]);
 
-        const products = Array.isArray(productsRes.data) ? productsRes.data : productsRes.data?.data || [];
-        const categories = Array.isArray(categoriesRes.data) ? categoriesRes.data : categoriesRes.data?.data || [];
-        const customers = Array.isArray(customersRes.data) ? customersRes.data : customersRes.data?.data || [];
-        const transactions = Array.isArray(transactionsRes.data) ? transactionsRes.data : transactionsRes.data?.data || [];
-        const warehouses = Array.isArray(warehousesRes.data) ? warehousesRes.data : warehousesRes.data?.data || [];
-        const suppliers = Array.isArray(suppliersRes.data) ? suppliersRes.data : suppliersRes.data?.data || [];
+        const rows = [productsRes, categoriesRes, customersRes, transactionsRes, warehousesRes, suppliersRes]
+          .map((response) => Array.isArray(response.data) ? response.data : response.data?.data || []);
 
-        setStats({
-          products: products.length,
-          categories: categories.length,
-          customers: customers.length,
-          transactions: transactions.length,
-          warehouses: warehouses.length,
-          suppliers: suppliers.length,
-        });
-      } catch (err) {
-        console.error('Failed to fetch stats:', err);
-        setStats({ products: 0, categories: 0, customers: 0, transactions: 0, warehouses: 0, suppliers: 0 });
+        if (active) {
+          setStats({
+            products: rows[0].length,
+            categories: rows[1].length,
+            customers: rows[2].length,
+            transactions: new Set(rows[3].map((transaction) => transaction.id)).size,
+            warehouses: rows[4].length,
+            suppliers: rows[5].length,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+        if (active) setStats({ products: 0, categories: 0, customers: 0, transactions: 0, warehouses: 0, suppliers: 0 });
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
+
     fetchStats();
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (loading) {
@@ -95,31 +97,30 @@ const Dashboard = () => {
     );
   }
 
+  const cards = [
+    { title: 'Produk', value: stats.products, icon: <InventoryIcon sx={{ fontSize: 26 }} />, color: '#0F766E' },
+    { title: 'Kategori', value: stats.categories, icon: <CategoryIcon sx={{ fontSize: 26 }} />, color: '#2563EB' },
+    { title: 'Pelanggan', value: stats.customers, icon: <PeopleIcon sx={{ fontSize: 26 }} />, color: '#D97706' },
+    { title: 'Pemasok', value: stats.suppliers, icon: <GroupIcon sx={{ fontSize: 26 }} />, color: '#7C3AED' },
+    { title: 'Transaksi', value: stats.transactions, icon: <ReceiptIcon sx={{ fontSize: 26 }} />, color: '#059669' },
+    { title: 'Gudang', value: stats.warehouses, icon: <WarehouseIcon sx={{ fontSize: 26 }} />, color: '#475569' },
+  ];
+
   return (
-    <Box>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: 'text.primary' }}>
-        Dashboard
-      </Typography>
-      <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={4}>
-          <StatCard title="Products" value={stats.products} icon={<InventoryIcon sx={{ fontSize: 28 }} />} color="#4318FF" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <StatCard title="Categories" value={stats.categories} icon={<CategoryIcon sx={{ fontSize: 28 }} />} color="#00B5D8" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <StatCard title="Customers" value={stats.customers} icon={<PeopleIcon sx={{ fontSize: 28 }} />} color="#FFB547" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <StatCard title="Suppliers" value={stats.suppliers} icon={<GroupIcon sx={{ fontSize: 28 }} />} color="#E31A1A" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <StatCard title="Transactions" value={stats.transactions} icon={<ReceiptIcon sx={{ fontSize: 28 }} />} color="#05CD99" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <StatCard title="Warehouses" value={stats.warehouses} icon={<WarehouseIcon sx={{ fontSize: 28 }} />} color="#8F9BBA" />
-        </Grid>
-      </Grid>
+    <Box sx={{ maxWidth: 1440, mx: 'auto' }}>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h4">Dashboard</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+          Ringkasan operasional toko.
+        </Typography>
+      </Box>
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' },
+        gap: 3,
+      }}>
+        {cards.map((card) => <StatCard key={card.title} {...card} />)}
+      </Box>
     </Box>
   );
 };
