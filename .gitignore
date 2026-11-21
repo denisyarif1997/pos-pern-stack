@@ -1,2 +1,93 @@
-node_modules
+# =============================================================================
+# .gitignore untuk Aplikasi POS (Node.js + React + Vite + Express + Prisma)
+# =============================================================================
+
+# -------------------------------------------------
+# Node.js / npm
+# -------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# package-lock.json disarankan untuk di-commit (reproducible installs)
+# Jika ingin mengabaikan, uncomment baris berikut:
+# package-lock.json
+.pnpm-store/
+.npm/
+
+# -------------------------------------------------
+# Environment files (sensitive - jangan commit ke git)
+# -------------------------------------------------
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging.local
+.env.development
+.env.test
+.env.production
+.env.staging
+
+# -------------------------------------------------
+# Build outputs
+# -------------------------------------------------
+dist/
+build/
+out/
+.next/
+.nuxt/
+.vuepress/dist/
+.svelte-kit/
+*.tsbuildinfo
+
+# Vite specific
+.vite/
+
+# -------------------------------------------------
+# IDE / Editor
+# -------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -------------------------------------------------
+# Logs
+# -------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# -------------------------------------------------
+# Prisma / Database
+# -------------------------------------------------
+prisma/migrations/*.sql
+*.db
+*.sqlite
+*.sqlite3
+
+# -------------------------------------------------
+# Coverage / Test reports
+# -------------------------------------------------
+coverage/
+.nyc_output/
+
+# -------------------------------------------------
+# OS generated files
+# -------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
